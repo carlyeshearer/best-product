@@ -5,7 +5,7 @@
 // File: MyHashMap.java
 // Description: Program creates a HashMap using hashing and hash tables.
 // **********************************************************************************
-package com.example.bestproduct;
+//package com.example.bestproduct;
 import java.util.*;
 public class MyHashMap<K, V> {
     private final static int DEFAULT_INITIAL_CAPACITY = 4;
