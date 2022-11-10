@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import java.io.IOException;
@@ -62,63 +63,49 @@ public class BestProduct extends Application {
         box.getChildren().addAll(titles, buttons);
         mainPane.getChildren().addAll(box);
 
-        //action events
-        EventHandler<ActionEvent> addEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e) {
-                addItem(scene, stage);
-            }
-        };
+        //set actions (improvement: lambda expressions for clarity)
+        add.setOnAction((event) -> {
+            addItem(scene, stage);
+        });
 
-        EventHandler<ActionEvent> viewEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e) {
-                viewItem(scene, stage);
-            }
-        };
+        remove.setOnAction((event) -> {
+            removeItem(scene, stage);
+        });
 
-        EventHandler<ActionEvent> removeEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e) {
-                removeItem(scene, stage);
-            }
-        };
+        view.setOnAction((event) -> {
+            viewItem(scene, stage);
+        });
 
-        EventHandler<ActionEvent> searchEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e) {
-                searchItem(scene, stage);
-            }
-        };
+        search.setOnAction((event) -> {
+            searchItem(scene, stage);
+        });
 
-        EventHandler<ActionEvent> helpEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e) {
-                help(scene, stage);
-            }
-        };
+        help.setOnAction((event) -> {
+            help(scene, stage);
+        });
 
-        EventHandler<ActionEvent> exitEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e)
-            {
-                saveFile(items);
-                items.forEach(item -> {
-                    System.out.println(item);
-                });
-                System.exit(0);
-            }
-        };
-
-        //set actions
-        add.setOnAction(addEvent);
-        remove.setOnAction(removeEvent);
-        exit.setOnAction(exitEvent);
-        view.setOnAction(viewEvent);
-        search.setOnAction(searchEvent);
-        help.setOnAction(helpEvent);
+        exit.setOnAction((event) -> {
+            saveFile(items);
+            items.forEach(item -> {
+                System.out.println(item);
+            });
+            System.exit(0);
+        });
 
         stage.setTitle("Item Sorter");
         stage.setScene(scene);
         stage.show();
     } //GUI components
 
+    //(Part 4): improvement - added an autosave so that items are not lost if the program
+    //crashes or a user exits without saving.
     public static void main(String[] args) {
         openFile(items);
+        //autosave feature
+        ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor();
+        exec.scheduleAtFixedRate(() -> {
+            saveFile(items);
+        }, 1, 1, TimeUnit.SECONDS);
         launch();
     } //launch and save
 
@@ -349,6 +336,8 @@ public class BestProduct extends Application {
         }
     }//remove item from items
 
+    //(Part 4) implements concurrent processing by accessing methods of each item in list
+    //concurrently. Is thread-safe because it is synchronized.
     public static void viewItem(Scene scene, Stage stage){
         //GUI components
         Pane pane = new Pane();
@@ -377,55 +366,36 @@ public class BestProduct extends Application {
             qualityB.setToggleGroup(group);
             availB.setToggleGroup(group);
 
+            //concurrent processing
             //button action events
             nameB.setOnAction(new EventHandler<ActionEvent>() {
-                @Override public void handle(ActionEvent e) {
-                    try{
-                        for(Item i : items){
-                            body.setText(getMessage(items, "name"));
-                        }
-                    }
-                    catch(ConcurrentModificationException c){
-                        //System.out.println(c);
+                @Override public synchronized void handle(ActionEvent e) {
+                    for(Item i : items){
+                        body.setText(getMessage(items, "name"));
                     }
                 }
             });
 
             priceB.setOnAction(new EventHandler<ActionEvent>() {
-                @Override public void handle(ActionEvent e) {
-                    try{
-                        for(Item i : items){
-                            body.setText(getMessage(items, "price"));
-                        }
-                    }
-                    catch(ConcurrentModificationException c){
-                        //System.out.println(c);
+                @Override public synchronized void handle(ActionEvent e) {
+                    for(Item i : items){
+                        body.setText(getMessage(items, "price"));
                     }
                 }
             });
 
             qualityB.setOnAction(new EventHandler<ActionEvent>() {
-                @Override public void handle(ActionEvent e) {
-                    try{
-                        for(Item i : items){
-                            body.setText(getMessage(items, "quality"));
-                        }
-                    }
-                    catch(ConcurrentModificationException c){
-                        //System.out.println(c);
+                @Override public synchronized void handle(ActionEvent e) {
+                    for(Item i : items){
+                        body.setText(getMessage(items, "quality"));
                     }
                 }
             });
 
             availB.setOnAction(new EventHandler<ActionEvent>() {
-                @Override public void handle(ActionEvent e) {
-                    try{
-                        for(Item i : items){
-                            body.setText(getMessage(items, "availability"));
-                        }
-                    }
-                    catch(ConcurrentModificationException c){
-                        //System.out.println(c);
+                @Override public synchronized void handle(ActionEvent e) {
+                    for(Item i : items){
+                        body.setText(getMessage(items, "availability"));
                     }
                 }
             });
@@ -555,10 +525,10 @@ public class BestProduct extends Application {
     public static void searchItem(Scene scene, Stage stage){
         //GUI components
         Pane pane = new Pane();
-        Scene searchScene = new Scene(pane, 400, 200);
+        Scene searchScene = new Scene(pane, 600, 200);
         VBox box = new VBox();
         TextField field = new TextField();
-        Label label = new Label("Please enter the name of the item to search for: ");
+        Label label = new Label("Please enter the name or price of the item to search for: ");
         Label body = new Label();
         Button search = new Button("Search");
         Button exit = new Button("Exit");
@@ -580,8 +550,14 @@ public class BestProduct extends Application {
                 box.getChildren().addAll(label, body, exit);
 
                 try{
-                    body.setText(searchByName(field.getText()).toString());
-                    label.setText("Item:");
+                    try{
+                        Double.parseDouble(field.getText());
+                        body.setText(searchByPrice(Double.parseDouble(field.getText())).toString());
+                    }
+                    catch(NumberFormatException m){
+                        body.setText(searchByName(field.getText()).toString());
+                        label.setText("Item:");
+                    }
                 }
                 catch(NullPointerException n){
                     box.getChildren().remove(body);
@@ -603,15 +579,30 @@ public class BestProduct extends Application {
     } //search for an item
 
     //(Part 2) implements map structure to search for an item by name
+    //(Part 3) implements hash table by using MyHashMap class to search for item in O(1) time
     public static Item searchByName(String name){
-        Map<String, Item> map = new HashMap<String, Item>();
+        MyHashMap<String, Item> map = new MyHashMap<String, Item>();
         for(Item i : items){
             map.put(i.getName(), i);
         }
 
-        for (Map.Entry<String, Item> pair : map.entrySet()) {
+        for (MyHashMap.Entry<String, Item> pair : map.entrySet()) {
             if(pair.getKey().equals(name)){
                 return pair.getValue();
+            }
+        }
+        return null;
+    }
+
+    //(Part 3) implements AVLTree to efficiently search for an item by price
+    public static Item searchByPrice(double price){
+        AVLTree tree = new AVLTree();
+        for(Item i : items){
+            tree.insert(i.getPrice());
+        }
+        for(Item i : items){
+            if(i.getPrice() == tree.find(price)){
+                return i;
             }
         }
         return null;
@@ -678,15 +669,9 @@ public class BestProduct extends Application {
         box.getChildren().addAll(title, subTitle, body, exit);
         pane.getChildren().addAll(box);
 
-        //action events
-        EventHandler<ActionEvent> exitEvent = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e)
-            {
-                stage.setScene(scene);
-            }
-        };
-
-        exit.setOnAction(exitEvent);
+        exit.setOnAction((event) -> {
+            stage.setScene(scene);
+        });
         stage.setScene(helpScene);
         stage.show();
     }
