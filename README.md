@@ -10,3 +10,5 @@ The Best Product application has been updated to include a LinkedList structure 
 The Best Product application has been updated to include an AVL tree which is used to efficiently search for an item by price. A new class called AVLTree has been created to implement this. The MyHashMap class uses hashing to efficiently search for an entry in the map structure used to search an item by name. Several methods have also been simplified to lambda expressions for better readability and clarity. 
 
 The Best Product application has been updated to include concurrent processing so that multiple method operations can be performed on the list of items concurrently. Each method is synchronized to ensure thread safety. An autosave feature has also been added to ensure user data is saved if the program crashes or the user forgets to save before closing the application.
+
+Link to YouTube demonstration: https://youtu.be/gJarcuHFews 
